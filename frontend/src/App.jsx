@@ -7,6 +7,8 @@ import Projects from "./pages/Projects"
 import Teams from "./pages/Teams"
 import Reports from "./pages/Reports"
 
+
+
 const App = () => {
   return(
     <BrowserRouter>
@@ -19,6 +21,8 @@ const App = () => {
       <Route path="/projects" element={<Projects/>}/>
       <Route path="/teams" element={<Teams/>}/>
       <Route path="/reports" element={<Reports/>}/>
+      
+   
 
 
 
