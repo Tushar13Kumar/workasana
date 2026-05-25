@@ -1,6 +1,6 @@
 import {useState , useEffect} from "react"
 import API from "../utils/axios"
-import Navbar from "../components/Nasvigate"
+import Navbar from "../components/Navbar"
 
 const Reports = () => {
     const [pending , setPending] = useState([])
