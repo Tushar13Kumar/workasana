@@ -12,6 +12,9 @@ const app = express();
 
 app.use(cors());
 app.use(express.json())
+app.use(cors({
+  origin: "https://workasana-six.vercel.app"
+}));
 app.use("/auth", authRoutes)
 app.use("/teams", teamRoutes)
 app.use("/projects", projectRoutes)
