@@ -6,7 +6,7 @@ const navItems = [
   { to: "/teams", label: "Team", icon: "👥" },
   { to: "/reports", label: "Reports", icon: "📊" },
     { to: "/tasks", label: "Tasks", icon: "▤" },
-  { to: "/settings", label: "Settings", icon: "⚙️" },
+  
 ];
 
 const Navbar = () => {
