@@ -1,151 +1,224 @@
 import { useState, useEffect } from "react";
 import API from "../utils/axios";
 import Navbar from "../components/Navbar";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, Cell,
+} from "recharts";
 
-const statusColors = {
-  "To Do": { bg: "#dbeafe", color: "#1d4ed8" },
-  "In Progress": { bg: "#fef9c3", color: "#a16207" },
-  "Completed": { bg: "#dcfce7", color: "#15803d" },
-  "Blocked": { bg: "#fee2e2", color: "#dc2626" },
-};
+const COLORS = ["#7c3aed", "#a78bfa", "#6d28d9", "#8b5cf6", "#c4b5fd", "#ddd6fe"];
 
 const Reports = () => {
-  const [allTasks, setAllTasks] = useState([]);
+  const [lastWeekTasks, setLastWeekTasks] = useState([]);
   const [pendingData, setPendingData] = useState(null);
+  const [byTeam, setByTeam] = useState([]);
+  const [byOwner, setByOwner] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchAll = async () => {
       try {
-        const [tasksRes, pendingRes] = await Promise.all([
-          API.get("/tasks"),
+        const [lastWeekRes, pendingRes, byTeamRes, byOwnerRes] = await Promise.all([
+          API.get("/report/last-week"),
           API.get("/report/pending"),
+          API.get("/report/by-team"),
+          API.get("/report/by-owner"),
         ]);
-        setAllTasks(tasksRes.data);
+        setLastWeekTasks(lastWeekRes.data);
         setPendingData(pendingRes.data);
+        setByTeam(byTeamRes.data);
+        setByOwner(byOwnerRes.data);
       } catch (e) {
         console.error(e);
       } finally {
         setLoading(false);
       }
     };
-    fetchData();
+    fetchAll();
   }, []);
 
-  const completedTasks = allTasks.filter(t => t.status === "Completed");
-  const inProgressTasks = allTasks.filter(t => t.status === "In Progress");
-  const blockedTasks = allTasks.filter(t => t.status === "Blocked");
-  const todoTasks = allTasks.filter(t => t.status === "To Do");
+  // Last week data — group by day for chart
+  const lastWeekChartData = (() => {
+    const days = {};
+    lastWeekTasks.forEach(task => {
+      const date = new Date(task.updatedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+      days[date] = (days[date] || 0) + 1;
+    });
+    return Object.entries(days).map(([date, count]) => ({ date, count }));
+  })();
 
-  const statCards = [
-    { label: "Total Pending Days", value: pendingData?.totalPendingdays ?? (loading ? "..." : 0), color: "#fef9c3", text: "#a16207" },
-    { label: "Completed Tasks", value: loading ? "..." : completedTasks.length, color: "#dcfce7", text: "#15803d" },
-    { label: "In Progress", value: loading ? "..." : inProgressTasks.length, color: "#dbeafe", text: "#1d4ed8" },
-    { label: "Blocked", value: loading ? "..." : blockedTasks.length, color: "#fee2e2", text: "#dc2626" },
-    { label: "To Do", value: loading ? "..." : todoTasks.length, color: "#f3f4f6", text: "#6b7280" },
-    { label: "Total Tasks", value: loading ? "..." : allTasks.length, color: "#ede9fe", text: "#7c3aed" },
-  ];
+  const cardStyle = {
+    backgroundColor: "#fff",
+    border: "1px solid #f3f4f6",
+    borderRadius: "16px",
+    padding: "24px",
+  };
+
+  const titleStyle = {
+    fontSize: "15px",
+    fontWeight: 600,
+    color: "#111827",
+    margin: "0 0 20px",
+  };
+
+  if (loading) return (
+    <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "#f9fafb" }}>
+      <Navbar />
+      <main style={{ marginLeft: "220px", flex: 1, padding: "32px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <p style={{ color: "#9ca3af" }}>Loading reports...</p>
+      </main>
+    </div>
+  );
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "#f9fafb" }}>
       <Navbar />
       <main style={{ marginLeft: "220px", flex: 1, padding: "32px", minWidth: 0 }}>
 
-        <h2 style={{ fontSize: "20px", fontWeight: 600, color: "#111827", margin: "0 0 24px" }}>Reports</h2>
+        <h2 style={{ fontSize: "20px", fontWeight: 600, color: "#111827", margin: "0 0 28px" }}>
+          Reports
+        </h2>
 
-        {/* Stat Cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "16px", marginBottom: "32px" }}>
-          {statCards.map((card, i) => (
-            <div key={i} style={{ backgroundColor: "#fff", border: "1px solid #f3f4f6", borderRadius: "12px", padding: "20px" }}>
-              <p style={{ fontSize: "12px", color: "#6b7280", margin: "0 0 8px", fontWeight: 500 }}>{card.label}</p>
-              <p style={{ fontSize: "28px", fontWeight: 700, color: "#111827", margin: 0 }}>{card.value}</p>
-            </div>
-          ))}
-        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
 
-        {/* All Tasks Overview Table */}
-        <div style={{ backgroundColor: "#fff", border: "1px solid #f3f4f6", borderRadius: "12px", overflow: "hidden" }}>
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6" }}>
-            <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 600, color: "#111827" }}>Task Overview</h3>
+          {/* Chart 1 — Total Work Done Last Week */}
+          <div style={cardStyle}>
+            <h3 style={titleStyle}>Total Work Done Last Week</h3>
+            {lastWeekChartData.length === 0 ? (
+              <EmptyChart message="No tasks completed in the last 7 days" />
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={lastWeekChartData} barSize={36}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={false} tickLine={false} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb", fontSize: "13px" }}
+                    formatter={(val) => [val, "Tasks Completed"]}
+                  />
+                  <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                    {lastWeekChartData.map((_, i) => (
+                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+            <p style={{ fontSize: "12px", color: "#9ca3af", margin: "12px 0 0", textAlign: "center" }}>
+              {lastWeekTasks.length} task{lastWeekTasks.length !== 1 ? "s" : ""} completed in last 7 days
+            </p>
           </div>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ borderBottom: "1px solid #f3f4f6" }}>
-                {["Task Name", "Project", "Team", "Status"].map(h => (
-                  <th key={h} style={{ padding: "12px 20px", textAlign: "left", fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={4} style={{ padding: "24px", textAlign: "center", color: "#9ca3af", fontSize: "14px" }}>Loading...</td></tr>
-              ) : allTasks.length === 0 ? (
-                <tr><td colSpan={4} style={{ padding: "24px", textAlign: "center", color: "#9ca3af", fontSize: "14px" }}>No tasks yet. Create some tasks first!</td></tr>
-              ) : allTasks.map((task, i) => {
-                const sc = statusColors[task.status] || { bg: "#f3f4f6", color: "#6b7280" };
-                return (
-                  <tr key={task._id || i} style={{ borderBottom: "1px solid #f9fafb" }}
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = "#fafafa"}
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
-                  >
-                    <td style={{ padding: "14px 20px", fontSize: "14px", color: "#111827", fontWeight: 500 }}>{task.name || task.title}</td>
-                    <td style={{ padding: "14px 20px", fontSize: "13px", color: "#6b7280" }}>{task.project?.name || "—"}</td>
-                    <td style={{ padding: "14px 20px", fontSize: "13px", color: "#6b7280" }}>{task.team?.name || "—"}</td>
-                    <td style={{ padding: "14px 20px" }}>
-                      <span style={{ backgroundColor: sc.bg, color: sc.color, fontSize: "11px", fontWeight: 600, padding: "3px 10px", borderRadius: "999px" }}>{task.status}</span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
 
-        {/* Last Week Completed Section */}
-        <LastWeekSection />
+          {/* Chart 2 — Total Days of Work Pending */}
+          <div style={cardStyle}>
+            <h3 style={titleStyle}>Total Days of Work Pending</h3>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "220px", gap: "12px" }}>
+              {/* Big number */}
+              <div style={{
+                width: "120px", height: "120px", borderRadius: "50%",
+                backgroundColor: "#fef9c3", border: "4px solid #fde047",
+                display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "center",
+              }}>
+                <span style={{ fontSize: "36px", fontWeight: 700, color: "#a16207", lineHeight: 1 }}>
+                  {pendingData?.totalPendingdays ?? 0}
+                </span>
+                <span style={{ fontSize: "11px", color: "#a16207", fontWeight: 600 }}>days</span>
+              </div>
+              <p style={{ fontSize: "13px", color: "#6b7280", margin: 0, textAlign: "center" }}>
+                {pendingData?.tasks?.length ?? 0} pending task{(pendingData?.tasks?.length ?? 0) !== 1 ? "s" : ""} total
+              </p>
+            </div>
+
+            {/* Pending tasks breakdown bar */}
+            {pendingData?.tasks?.length > 0 && (
+              <div style={{ marginTop: "8px" }}>
+                {["To Do", "In Progress", "Blocked"].map(status => {
+                  const count = pendingData.tasks.filter(t => t.status === status).length;
+                  const pct = Math.round((count / pendingData.tasks.length) * 100);
+                  const colors = { "To Do": "#3b82f6", "In Progress": "#f59e0b", "Blocked": "#ef4444" };
+                  if (count === 0) return null;
+                  return (
+                    <div key={status} style={{ marginBottom: "8px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}>
+                        <span>{status}</span>
+                        <span>{count} tasks</span>
+                      </div>
+                      <div style={{ height: "6px", backgroundColor: "#f3f4f6", borderRadius: "999px", overflow: "hidden" }}>
+                        <div style={{ width: `${pct}%`, height: "100%", backgroundColor: colors[status], borderRadius: "999px" }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Chart 3 — Tasks Closed by Team */}
+          <div style={cardStyle}>
+            <h3 style={titleStyle}>Tasks Closed by Team</h3>
+            {byTeam.length === 0 ? (
+              <EmptyChart message="No completed tasks by team yet" />
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={byTeam} barSize={36} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
+                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={false} tickLine={false} width={90} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb", fontSize: "13px" }}
+                    formatter={(val) => [val, "Tasks Completed"]}
+                  />
+                  <Bar dataKey="count" radius={[0, 6, 6, 0]}>
+                    {byTeam.map((_, i) => (
+                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          {/* Chart 4 — Tasks Closed by Owner */}
+          <div style={cardStyle}>
+            <h3 style={titleStyle}>Tasks Closed by Owner</h3>
+            {byOwner.length === 0 ? (
+              <EmptyChart message="No completed tasks by owner yet" />
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={byOwner} barSize={36} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
+                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={false} tickLine={false} width={90} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb", fontSize: "13px" }}
+                    formatter={(val) => [val, "Tasks Completed"]}
+                  />
+                  <Bar dataKey="count" radius={[0, 6, 6, 0]}>
+                    {byOwner.map((_, i) => (
+                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+        </div>
       </main>
     </div>
   );
 };
 
-const LastWeekSection = () => {
-  const [lastWeekTasks, setLastWeekTasks] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    API.get("/report/last-week")
-      .then(res => setLastWeekTasks(res.data))
-      .catch(e => console.error(e))
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading || lastWeekTasks.length === 0) return null;
-
-  return (
-    <div style={{ backgroundColor: "#fff", border: "1px solid #f3f4f6", borderRadius: "12px", overflow: "hidden", marginTop: "24px" }}>
-      <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6" }}>
-        <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 600, color: "#111827" }}>Completed Last 7 Days</h3>
-      </div>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr style={{ borderBottom: "1px solid #f3f4f6" }}>
-            {["Task Name", "Project", "Team"].map(h => (
-              <th key={h} style={{ padding: "12px 20px", textAlign: "left", fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {lastWeekTasks.map((task, i) => (
-            <tr key={task._id || i} style={{ borderBottom: "1px solid #f9fafb" }}>
-              <td style={{ padding: "14px 20px", fontSize: "14px", color: "#111827" }}>{task.name || task.title}</td>
-              <td style={{ padding: "14px 20px", fontSize: "13px", color: "#6b7280" }}>{task.project?.name || "—"}</td>
-              <td style={{ padding: "14px 20px", fontSize: "13px", color: "#6b7280" }}>{task.team?.name || "—"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-};
+// Empty state component
+const EmptyChart = ({ message }) => (
+  <div style={{
+    height: "220px", display: "flex", alignItems: "center",
+    justifyContent: "center", flexDirection: "column", gap: "8px",
+  }}>
+    <span style={{ fontSize: "32px" }}>📊</span>
+    <p style={{ fontSize: "13px", color: "#9ca3af", margin: 0, textAlign: "center" }}>{message}</p>
+  </div>
+);
 
 export default Reports;
