@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import API from "../utils/axios";
 import Navbar from "../components/Navbar";
 
@@ -6,16 +7,22 @@ const statusColors = {
   "To Do": { bg: "#dbeafe", color: "#1d4ed8" },
   "In Progress": { bg: "#fef9c3", color: "#a16207" },
   "Completed": { bg: "#dcfce7", color: "#15803d" },
+  "Blocked": { bg: "#fee2e2", color: "#dc2626" },
 };
 
 const Tasks = () => {
+  const navigate = useNavigate();
   const [tasks, setTasks] = useState([]);
   const [filter, setFilter] = useState("All");
 
   useEffect(() => {
     const fetchData = async () => {
-      const res = await API.get("/tasks");
-      setTasks(res.data);
+      try {
+        const res = await API.get("/tasks");
+        setTasks(res.data);
+      } catch (e) {
+        console.error(e);
+      }
     };
     fetchData();
   }, []);
@@ -30,7 +37,7 @@ const Tasks = () => {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>
           <h2 style={{ fontSize: "20px", fontWeight: 600, color: "#111827", margin: 0 }}>Tasks</h2>
           <div style={{ display: "flex", gap: "8px" }}>
-            {["All", "To Do", "In Progress", "Completed"].map(f => (
+            {["All", "To Do", "In Progress", "Completed", "Blocked"].map(f => (
               <button key={f} onClick={() => setFilter(f)} style={{
                 fontSize: "12px", padding: "5px 14px", borderRadius: "999px",
                 border: `1px solid ${filter === f ? "#7c3aed" : "#e5e7eb"}`,
@@ -57,18 +64,22 @@ const Tasks = () => {
                 <tr><td colSpan={5} style={{ padding: "24px 16px", textAlign: "center", color: "#9ca3af", fontSize: "14px" }}>No tasks found</td></tr>
               ) : filtered.map(task => {
                 const sc = statusColors[task.status] || { bg: "#f3f4f6", color: "#6b7280" };
+                const ownerName = task.owners?.[0]?.name || task.owner?.name || "Unassigned";
+                const ownerInitial = ownerName[0]?.toUpperCase() || "?";
                 return (
-                  <tr key={task._id} style={{ borderBottom: "1px solid #f9fafb" }}
+                  <tr key={task._id}
+                    onClick={() => navigate(`/tasks/${task._id}`)}
+                    style={{ borderBottom: "1px solid #f9fafb", cursor: "pointer" }}
                     onMouseEnter={e => e.currentTarget.style.backgroundColor = "#fafafa"}
                     onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
                   >
-                    <td style={{ padding: "14px 16px", fontSize: "14px", fontWeight: 500, color: "#111827" }}>{task.title || task.name}</td>
+                    <td style={{ padding: "14px 16px", fontSize: "14px", fontWeight: 500, color: "#111827" }}>{task.name || task.title}</td>
                     <td style={{ padding: "14px 16px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         <div style={{ width: "28px", height: "28px", borderRadius: "50%", backgroundColor: "#ede9fe", color: "#7c3aed", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 600 }}>
-                          {task.owner?.name?.[0]?.toUpperCase() || "?"}
+                          {ownerInitial}
                         </div>
-                        <span style={{ fontSize: "13px", color: "#374151" }}>{task.owner?.name || "Unassigned"}</span>
+                        <span style={{ fontSize: "13px", color: "#374151" }}>{ownerName}</span>
                       </div>
                     </td>
                     <td style={{ padding: "14px 16px" }}>

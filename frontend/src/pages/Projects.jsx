@@ -4,26 +4,41 @@ import API from "../utils/axios";
 import Navbar from "../components/Navbar";
 
 const Projects = () => {
+  const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const fetchData = async () => {
-      const res = await API.get("/projects");
-      setProjects(res.data);
+      try {
+        const res = await API.get("/projects");
+        setProjects(res.data);
+      } catch (e) {
+        console.error(e);
+      }
     };
     fetchData();
   }, []);
 
   const handleCreate = async () => {
     if (!name.trim()) return;
+    setLoading(true);
+    setError("");
     try {
       const res = await API.post("/projects", { name, description });
       setProjects([...projects, res.data]);
-      setName(""); setDescription(""); setShowModal(false);
-    } catch (e) { console.error(e); }
+      setName("");
+      setDescription("");
+      setShowModal(false);
+    } catch (e) {
+      setError(e.response?.data?.message || "Failed to create project");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -34,7 +49,7 @@ const Projects = () => {
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>
           <h2 style={{ fontSize: "20px", fontWeight: 600, color: "#111827", margin: 0 }}>Projects</h2>
-          <button onClick={() => setShowModal(true)} style={{
+          <button onClick={() => { setError(""); setShowModal(true); }} style={{
             backgroundColor: "#7c3aed", color: "#fff", border: "none",
             borderRadius: "8px", padding: "9px 18px", fontSize: "13px",
             fontWeight: 500, cursor: "pointer",
@@ -46,11 +61,13 @@ const Projects = () => {
           {projects.length === 0 ? (
             <p style={{ color: "#9ca3af", fontSize: "14px" }}>No projects yet. Create one!</p>
           ) : projects.map((proj) => (
-            <div key={proj._id} style={{
-              backgroundColor: "#fff", border: "1px solid #f3f4f6",
-              borderRadius: "12px", padding: "20px", cursor: "pointer",
-              transition: "box-shadow 0.15s",
-            }}
+            <div key={proj._id}
+              onClick={() => navigate(`/projects/${proj._id}`)}
+              style={{
+                backgroundColor: "#fff", border: "1px solid #f3f4f6",
+                borderRadius: "12px", padding: "20px", cursor: "pointer",
+                transition: "box-shadow 0.15s",
+              }}
               onMouseEnter={e => e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.08)"}
               onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
             >
@@ -82,7 +99,8 @@ const Projects = () => {
                 <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "#111827" }}>Create New Project</h3>
                 <button onClick={() => setShowModal(false)} style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "#9ca3af" }}>×</button>
               </div>
-              <label style={{ fontSize: "13px", fontWeight: 500, color: "#374151", display: "block", marginBottom: "6px" }}>Project Name</label>
+              {error && <p style={{ color: "#ef4444", fontSize: "13px", marginBottom: "12px" }}>{error}</p>}
+              <label style={{ fontSize: "13px", fontWeight: 500, color: "#374151", display: "block", marginBottom: "6px" }}>Project Name *</label>
               <input value={name} onChange={e => setName(e.target.value)} placeholder="Enter project name"
                 style={{ width: "100%", padding: "9px 12px", border: "1px solid #e5e7eb", borderRadius: "8px", fontSize: "14px", outline: "none", marginBottom: "16px", boxSizing: "border-box" }} />
               <label style={{ fontSize: "13px", fontWeight: 500, color: "#374151", display: "block", marginBottom: "6px" }}>Project Description</label>
@@ -90,7 +108,9 @@ const Projects = () => {
                 style={{ width: "100%", padding: "9px 12px", border: "1px solid #e5e7eb", borderRadius: "8px", fontSize: "14px", outline: "none", marginBottom: "20px", boxSizing: "border-box", resize: "none" }} />
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
                 <button onClick={() => setShowModal(false)} style={{ padding: "8px 18px", border: "1px solid #e5e7eb", borderRadius: "8px", backgroundColor: "#fff", fontSize: "13px", cursor: "pointer", color: "#6b7280" }}>Cancel</button>
-                <button onClick={handleCreate} style={{ padding: "8px 18px", border: "none", borderRadius: "8px", backgroundColor: "#7c3aed", color: "#fff", fontSize: "13px", fontWeight: 500, cursor: "pointer" }}>Create</button>
+                <button onClick={handleCreate} disabled={loading} style={{ padding: "8px 18px", border: "none", borderRadius: "8px", backgroundColor: "#7c3aed", color: "#fff", fontSize: "13px", fontWeight: 500, cursor: "pointer", opacity: loading ? 0.7 : 1 }}>
+                  {loading ? "Creating..." : "Create"}
+                </button>
               </div>
             </div>
           </div>
