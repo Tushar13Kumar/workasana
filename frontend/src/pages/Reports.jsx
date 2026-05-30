@@ -1,12 +1,65 @@
 import { useState, useEffect } from "react";
 import API from "../utils/axios";
 import Navbar from "../components/Navbar";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Cell,
-} from "recharts";
 
-const COLORS = ["#7c3aed", "#a78bfa", "#6d28d9", "#8b5cf6", "#c4b5fd", "#ddd6fe"];
+const COLORS = ["#7c3aed", "#a78bfa", "#6d28d9", "#8b5cf6", "#c4b5fd", "#3b82f6"];
+
+// Simple bar chart — no external library
+const BarChart = ({ data, valueKey = "count", labelKey = "name", horizontal = false }) => {
+  if (!data || data.length === 0) return (
+    <div style={{ height: "180px", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "8px" }}>
+      <span style={{ fontSize: "28px" }}>📊</span>
+      <p style={{ fontSize: "13px", color: "#9ca3af", margin: 0 }}>No data yet</p>
+    </div>
+  );
+
+  const max = Math.max(...data.map(d => d[valueKey]));
+
+  if (horizontal) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: "12px", padding: "4px 0" }}>
+        {data.map((item, i) => (
+          <div key={i}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+              <span style={{ fontSize: "12px", color: "#374151", fontWeight: 500 }}>{item[labelKey]}</span>
+              <span style={{ fontSize: "12px", color: "#6b7280", fontWeight: 600 }}>{item[valueKey]}</span>
+            </div>
+            <div style={{ height: "8px", backgroundColor: "#f3f4f6", borderRadius: "999px", overflow: "hidden" }}>
+              <div style={{
+                width: `${(item[valueKey] / max) * 100}%`,
+                height: "100%",
+                backgroundColor: COLORS[i % COLORS.length],
+                borderRadius: "999px",
+                transition: "width 0.6s ease",
+              }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Vertical bars
+  return (
+    <div style={{ display: "flex", alignItems: "flex-end", gap: "12px", height: "180px", padding: "0 8px" }}>
+      {data.map((item, i) => (
+        <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", height: "100%" }}>
+          <span style={{ fontSize: "11px", fontWeight: 600, color: COLORS[i % COLORS.length] }}>{item[valueKey]}</span>
+          <div style={{ flex: 1, width: "100%", display: "flex", alignItems: "flex-end" }}>
+            <div style={{
+              width: "100%",
+              height: `${Math.max((item[valueKey] / max) * 100, 8)}%`,
+              backgroundColor: COLORS[i % COLORS.length],
+              borderRadius: "6px 6px 0 0",
+              transition: "height 0.6s ease",
+            }} />
+          </div>
+          <span style={{ fontSize: "10px", color: "#6b7280", textAlign: "center", lineHeight: 1.2 }}>{item[labelKey]}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 const Reports = () => {
   const [lastWeekTasks, setLastWeekTasks] = useState([]);
@@ -37,14 +90,14 @@ const Reports = () => {
     fetchAll();
   }, []);
 
-  // Last week data — group by day for chart
+  // Last week — group by date
   const lastWeekChartData = (() => {
     const days = {};
     lastWeekTasks.forEach(task => {
       const date = new Date(task.updatedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
       days[date] = (days[date] || 0) + 1;
     });
-    return Object.entries(days).map(([date, count]) => ({ date, count }));
+    return Object.entries(days).map(([name, count]) => ({ name, count }));
   })();
 
   const cardStyle = {
@@ -55,10 +108,8 @@ const Reports = () => {
   };
 
   const titleStyle = {
-    fontSize: "15px",
-    fontWeight: 600,
-    color: "#111827",
-    margin: "0 0 20px",
+    fontSize: "15px", fontWeight: 600,
+    color: "#111827", margin: "0 0 20px",
   };
 
   if (loading) return (
@@ -75,77 +126,57 @@ const Reports = () => {
       <Navbar />
       <main style={{ marginLeft: "220px", flex: 1, padding: "32px", minWidth: 0 }}>
 
-        <h2 style={{ fontSize: "20px", fontWeight: 600, color: "#111827", margin: "0 0 28px" }}>
-          Reports
-        </h2>
+        <h2 style={{ fontSize: "20px", fontWeight: 600, color: "#111827", margin: "0 0 28px" }}>Reports</h2>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
 
           {/* Chart 1 — Total Work Done Last Week */}
           <div style={cardStyle}>
             <h3 style={titleStyle}>Total Work Done Last Week</h3>
-            {lastWeekChartData.length === 0 ? (
-              <EmptyChart message="No tasks completed in the last 7 days" />
-            ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={lastWeekChartData} barSize={36}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={false} tickLine={false} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb", fontSize: "13px" }}
-                    formatter={(val) => [val, "Tasks Completed"]}
-                  />
-                  <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                    {lastWeekChartData.map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-            <p style={{ fontSize: "12px", color: "#9ca3af", margin: "12px 0 0", textAlign: "center" }}>
+            <BarChart data={lastWeekChartData} valueKey="count" labelKey="name" />
+            <p style={{ fontSize: "12px", color: "#9ca3af", margin: "16px 0 0", textAlign: "center" }}>
               {lastWeekTasks.length} task{lastWeekTasks.length !== 1 ? "s" : ""} completed in last 7 days
             </p>
           </div>
 
-          {/* Chart 2 — Total Days of Work Pending */}
+          {/* Chart 2 — Total Days Pending */}
           <div style={cardStyle}>
             <h3 style={titleStyle}>Total Days of Work Pending</h3>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "220px", gap: "12px" }}>
-              {/* Big number */}
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", marginBottom: "20px" }}>
               <div style={{
-                width: "120px", height: "120px", borderRadius: "50%",
+                width: "110px", height: "110px", borderRadius: "50%",
                 backgroundColor: "#fef9c3", border: "4px solid #fde047",
                 display: "flex", flexDirection: "column",
                 alignItems: "center", justifyContent: "center",
               }}>
-                <span style={{ fontSize: "36px", fontWeight: 700, color: "#a16207", lineHeight: 1 }}>
+                <span style={{ fontSize: "34px", fontWeight: 700, color: "#a16207", lineHeight: 1 }}>
                   {pendingData?.totalPendingdays ?? 0}
                 </span>
                 <span style={{ fontSize: "11px", color: "#a16207", fontWeight: 600 }}>days</span>
               </div>
-              <p style={{ fontSize: "13px", color: "#6b7280", margin: 0, textAlign: "center" }}>
-                {pendingData?.tasks?.length ?? 0} pending task{(pendingData?.tasks?.length ?? 0) !== 1 ? "s" : ""} total
+              <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>
+                {pendingData?.tasks?.length ?? 0} pending tasks
               </p>
             </div>
 
-            {/* Pending tasks breakdown bar */}
-            {pendingData?.tasks?.length > 0 && (
-              <div style={{ marginTop: "8px" }}>
-                {["To Do", "In Progress", "Blocked"].map(status => {
-                  const count = pendingData.tasks.filter(t => t.status === status).length;
+            {/* Breakdown bars */}
+            {(pendingData?.tasks?.length ?? 0) > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {[
+                  { label: "To Do", color: "#3b82f6" },
+                  { label: "In Progress", color: "#f59e0b" },
+                  { label: "Blocked", color: "#ef4444" },
+                ].map(({ label, color }) => {
+                  const count = pendingData.tasks.filter(t => t.status === label).length;
                   const pct = Math.round((count / pendingData.tasks.length) * 100);
-                  const colors = { "To Do": "#3b82f6", "In Progress": "#f59e0b", "Blocked": "#ef4444" };
                   if (count === 0) return null;
                   return (
-                    <div key={status} style={{ marginBottom: "8px" }}>
+                    <div key={label}>
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}>
-                        <span>{status}</span>
-                        <span>{count} tasks</span>
+                        <span>{label}</span><span>{count}</span>
                       </div>
                       <div style={{ height: "6px", backgroundColor: "#f3f4f6", borderRadius: "999px", overflow: "hidden" }}>
-                        <div style={{ width: `${pct}%`, height: "100%", backgroundColor: colors[status], borderRadius: "999px" }} />
+                        <div style={{ width: `${pct}%`, height: "100%", backgroundColor: color, borderRadius: "999px" }} />
                       </div>
                     </div>
                   );
@@ -157,51 +188,13 @@ const Reports = () => {
           {/* Chart 3 — Tasks Closed by Team */}
           <div style={cardStyle}>
             <h3 style={titleStyle}>Tasks Closed by Team</h3>
-            {byTeam.length === 0 ? (
-              <EmptyChart message="No completed tasks by team yet" />
-            ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={byTeam} barSize={36} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
-                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={false} tickLine={false} width={90} />
-                  <Tooltip
-                    contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb", fontSize: "13px" }}
-                    formatter={(val) => [val, "Tasks Completed"]}
-                  />
-                  <Bar dataKey="count" radius={[0, 6, 6, 0]}>
-                    {byTeam.map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
+            <BarChart data={byTeam} valueKey="count" labelKey="name" horizontal />
           </div>
 
           {/* Chart 4 — Tasks Closed by Owner */}
           <div style={cardStyle}>
             <h3 style={titleStyle}>Tasks Closed by Owner</h3>
-            {byOwner.length === 0 ? (
-              <EmptyChart message="No completed tasks by owner yet" />
-            ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={byOwner} barSize={36} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
-                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={false} tickLine={false} width={90} />
-                  <Tooltip
-                    contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb", fontSize: "13px" }}
-                    formatter={(val) => [val, "Tasks Completed"]}
-                  />
-                  <Bar dataKey="count" radius={[0, 6, 6, 0]}>
-                    {byOwner.map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
+            <BarChart data={byOwner} valueKey="count" labelKey="name" horizontal />
           </div>
 
         </div>
@@ -209,16 +202,5 @@ const Reports = () => {
     </div>
   );
 };
-
-// Empty state component
-const EmptyChart = ({ message }) => (
-  <div style={{
-    height: "220px", display: "flex", alignItems: "center",
-    justifyContent: "center", flexDirection: "column", gap: "8px",
-  }}>
-    <span style={{ fontSize: "32px" }}>📊</span>
-    <p style={{ fontSize: "13px", color: "#9ca3af", margin: 0, textAlign: "center" }}>{message}</p>
-  </div>
-);
 
 export default Reports;
