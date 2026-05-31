@@ -1,17 +1,17 @@
-const express = require("express")
-const mongoose = require("mongoose")
-const cors = require("cors")
-require("dotenv").config()
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+require("dotenv").config();
 
-const authRoutes = require("./routes/auth")
-const teamRoutes = require("./routes/teams")
-const projectRoutes = require("./routes/projects")
-const taskRoutes = require("./routes/tasks")
-const reportRoutes = require("./routes/reports")
+const authRoutes = require("./routes/auth");
+const teamRoutes = require("./routes/teams");
+const projectRoutes = require("./routes/projects");
+const taskRoutes = require("./routes/tasks");
+const reportRoutes = require("./routes/reports");
+const tagRoutes = require("./routes/tags"); // ✅ naya
 
 const app = express();
 
-// ✅ CORS — sirf ek baar, sahi tarike se
 app.use(cors({
   origin: ["https://workasana-six.vercel.app", "http://localhost:5173"],
   methods: ["GET", "POST", "PATCH", "DELETE"],
@@ -26,6 +26,7 @@ app.use("/teams", teamRoutes);
 app.use("/projects", projectRoutes);
 app.use("/tasks", taskRoutes);
 app.use("/report", reportRoutes);
+app.use("/tags", tagRoutes); // ✅ naya
 
 app.get("/", (req, res) => {
   res.json({ message: "workasana backend is running" });
